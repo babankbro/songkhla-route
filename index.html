@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Beautiful Lat/Lng Map</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <!-- Font Awesome (icons) -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg:#0b1220; --panel:#111a2b; --text:#e9edf5; --muted:#a6b3c9; --accent:#00ABD0; --border:#1f2a44;
+      --bg-light:#f7f9fc; --panel-light:#ffffff; --text-light:#0b1220; --muted-light:#4c5a72; --border-light:#e6eaf2;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0}
+    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:var(--bg-light); color:var(--text-light);}
+
+    /* Layout */
+    .app{display:grid; grid-template-rows:auto 1fr; height:100%;}
+    header{
+      display:flex; align-items:center; gap:12px; padding:12px 16px;
+      background:var(--panel-light); border-bottom:1px solid var(--border-light);
+    }
+    .brand{display:flex; gap:10px; align-items:center; font-weight:800; letter-spacing:.3px;}
+    .brand .dot{width:10px;height:10px;border-radius:50%;background:var(--accent); box-shadow:0 0 16px rgba(0,171,208,.7)}
+    .actions{display:flex; gap:8px; margin-left:auto; flex-wrap:wrap;}
+    .btn{
+      display:inline-flex; align-items:center; gap:8px; padding:10px 12px; border-radius:12px; border:1px solid var(--border-light);
+      background:var(--panel-light); color:var(--text-light); cursor:pointer; font-weight:600; transition:.2s;
+    }
+    .btn:hover{transform:translateY(-1px); box-shadow:0 6px 20px rgba(0,0,0,.06)}
+    .btn.primary{background:var(--accent); color:white; border-color:transparent}
+    .btn.toggle.active{outline:2px solid var(--accent)}
+    .search{
+      min-width:260px; display:flex; align-items:center; gap:8px; padding:10px 12px; border-radius:12px;
+      border:1px solid var(--border-light); background:var(--panel-light); color:var(--text-light);
+    }
+    .search input{border:none; outline:none; flex:1; background:transparent; color:inherit}
+
+    .main{display:grid; grid-template-columns:320px 1fr; min-height:0;}
+    aside{
+      border-right:1px solid var(--border-light); background:var(--panel-light); padding:12px; overflow:auto;
+    }
+    .side-title{font-weight:700; margin:8px 6px 12px}
+    .list{display:flex; flex-direction:column; gap:8px;}
+    .card{
+      border:1px solid var(--border-light); border-radius:14px; padding:10px 12px; background:white; cursor:pointer; transition:.15s;
+    }
+    .card:hover{border-color:var(--accent); box-shadow:0 6px 20px rgba(0,171,208,.1)}
+    .card .small{color:#6b7280; font-size:12px}
+    .map-wrap{position:relative;}
+    #map{height:100%; width:100%;}
+    .legend{
+      position:absolute; right:16px; bottom:16px; background:white; border:1px solid var(--border-light);
+      border-radius:12px; padding:10px 12px; box-shadow:0 6px 20px rgba(0,0,0,.08); font-size:13px;
+    }
+
+    /* Dark mode */
+    body.dark{background:var(--bg); color:var(--text);}
+    body.dark header{background:var(--panel); border-color:var(--border);}
+    body.dark .btn{background:var(--panel); border-color:var(--border); color:var(--text)}
+    body.dark .btn.primary{color:#041018}
+    body.dark .search{background:var(--panel); border-color:var(--border); color:var(--text)}
+    body.dark aside{background:var(--panel); border-color:var(--border)}
+    body.dark .card{background:#0f1626; border-color:var(--border); color:var(--text)}
+    body.dark .card .small{color:var(--muted)}
+    body.dark .legend{background:#0f1626; border-color:var(--border); color:var(--text)}
+    @media (max-width: 900px){
+      .main{grid-template-columns:1fr}
+      aside{order:2; height:45vh}
+      .map-wrap{order:1; height:55vh}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="brand"><span class="dot"></span> Coordinates Map</div>
+
+      <div class="search" title="Filter by code or lat/lng">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input id="search" placeholder="Search code or latitude/longitude…" />
+      </div>
+
+      <div class="actions">
+        <button class="btn toggle" id="darkBtn" title="Toggle dark mode"><i class="fa-solid fa-moon"></i> Theme</button>
+        <!-- <button class="btn toggle active" id="clusterBtn" title="Toggle clustering"><i class="fa-solid fa-layer-group"></i> Cluster</button> -->
+        <!-- <button class="btn toggle active" id="pathBtn" title="Toggle polyline path"><i class="fa-solid fa-route"></i> Path</button> -->
+        <button class="btn toggle" id="navModeBtn" title="Toggle between straight line and navigation routing"><i class="fa-solid fa-road"></i> <span id="navModeText">Straight Line</span></button>
+        <button class="btn toggle active" id="route1Btn" title="Show Route 1"><i class="fa-solid fa-1"></i> Route 1</button>
+        <button class="btn toggle" id="route2Btn" title="Show Route 2"><i class="fa-solid fa-2"></i> Route 2</button>
+        <button class="btn" id="fitBtn" title="Fit all markers"><i class="fa-solid fa-up-right-and-down-left-from-center"></i> Fit</button>
+        <button class="btn primary" id="resetBtn" title="Reset filters"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+      </div>
+    </header>
+
+    <section class="main">
+      <aside>
+        <div class="side-title">Points <span id="count" class="small"></span></div>
+        <div id="list" class="list"></div>
+      </aside>
+
+      <div class="map-wrap">
+        <div id="map"></div>
+        <div class="legend">
+          <div style="font-weight:700; margin-bottom:6px">Legend</div>
+          <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#00ABD0;margin-right:6px;"></span> Default Marker</div>
+          <div><span style="display:inline-block;width:18px;height:3px;background:#00ABD0;margin-right:6px;margin-left:2px;vertical-align:middle;"></span> Default Path</div>
+          <div id="route1Legend" style="display:none;">
+            <div style="font-weight:600; margin:8px 0 4px; font-size:12px;">Route 1:</div>
+            <div><span style="display:inline-block;width:18px;height:3px;background:#0000FF;margin-right:6px;margin-left:2px;vertical-align:middle;"></span> Trip 1 (Blue)</div>
+            <div><span style="display:inline-block;width:18px;height:3px;background:#00FF00;margin-right:6px;margin-left:2px;vertical-align:middle;"></span> Trip 2 (Green)</div>
+            <div><span style="display:inline-block;width:18px;height:3px;background:#FF8000;margin-right:6px;margin-left:2px;vertical-align:middle;"></span> Trip 3 (Orange)</div>
+            <div><span style="display:inline-block;width:18px;height:3px;background:#8000FF;margin-right:6px;margin-left:2px;vertical-align:middle;"></span> Trip 4 (Purple)</div>
+          </div>
+          <div id="route2Legend" style="display:none;">
+            <div style="font-weight:600; margin:8px 0 4px; font-size:12px;">Route 2:</div>
+            <div><span style="display:inline-block;width:18px;height:3px;background:#FF0000;margin-right:6px;margin-left:2px;vertical-align:middle;"></span> Trip 1 (Red)</div>
+            <div><span style="display:inline-block;width:18px;height:3px;background:#FF1493;margin-right:6px;margin-left:2px;vertical-align:middle;"></span> Trip 2 (Pink)</div>
+            <div><span style="display:inline-block;width:18px;height:3px;background:#00FFFF;margin-right:6px;margin-left:2px;vertical-align:middle;"></span> Trip 3 (Cyan)</div>
+            <div><span style="display:inline-block;width:18px;height:3px;background:#FFFF00;margin-right:6px;margin-left:2px;vertical-align:middle;"></span> Trip 4 (Yellow)</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Data -->
+  <script>
+    const LOCATIONS = [
+      { code: 0,  lat: 7.1255, lng: 100.5572 },
+      { code: 1,  lat: 7.54290323602401, lng: 100.30084046443473 },
+      { code: 2,  lat: 7.63762617609212, lng: 100.33361744909297 },
+      { code: 3,  lat: 7.60138255658239, lng: 100.39213149512429 },
+      { code: 4,  lat: 7.47467340270290, lng: 100.43924562767184 },
+      { code: 5,  lat: 7.19521076441707, lng: 100.57853576630893 },
+      { code: 6,  lat: 7.18900307891733, lng: 100.40428702211622 },
+      { code: 7,  lat: 7.01985315559553, lng: 100.41253476259420 },
+      { code: 8,  lat: 6.88457803686984, lng: 100.41409107903985 },
+      { code: 9,  lat: 7.01389261954571, lng: 100.46564522767486 },
+      { code: 10, lat: 7.00525546744017, lng: 100.51639832397670 },
+      { code: 11, lat: 7.00360856841674, lng: 100.45423047742600 },
+      { code: 12, lat: 7.19537563214922, lng: 100.58999283805554 },
+      { code: 13, lat: 7.21046718391510, lng: 100.58961680069763 },
+      { code: 14, lat: 7.19603678255522, lng: 100.59348794491808 },
+      { code: 15, lat: 7.18309359978785, lng: 100.61764270196703 },
+      { code: 16, lat: 6.81893106481225, lng: 100.65528335281931 },
+      { code: 17, lat: 6.57429853259277, lng: 100.57578220439580 },
+      { code: 18, lat: 6.71544424934970, lng: 100.27768713933163 },
+      { code: 19, lat: 6.96166279530552, lng: 100.56873565650348 },
+      { code: 20, lat: 6.96672789173309, lng: 100.55781963747127 }
+    ];
+
+    // Route 1 (แผนที่ชุด 1) - Different colors for each trip
+    const ROUTE1_SEQUENCES = [
+      { sequence: [0, 14, 12, 13, 15, 9, 11, 7, 19, 0], color: "#AE75DA" }, // Trip 1 - Blue
+      { sequence: [0, 5, 4, 3, 2, 1, 6, 0], color: "#AE75DA" },             // Trip 2 - Green
+      { sequence: [0, 20, 10, 8, 18, 17, 0], color: "#AE75DA" },            // Trip 3 - Orange
+      { sequence: [0, 16, 0], color: "#AE75DA" }                            // Trip 4 - Purple
+    ];
+
+    // Route 2 (แผนที่ชุด 2) - Different colors for each trip
+    const ROUTE2_SEQUENCES = [
+      { sequence: [0, 1, 2, 3, 4, 5, 0], color: "#3396D3" },                // Trip 1 - Red
+      { sequence: [0, 6, 7, 11, 12, 13, 14, 15, 0], color: "#3396D3" },     // Trip 2 - Deep Pink
+      { sequence: [0, 8, 16, 17, 18, 0], color: "#3396D3" },                // Trip 3 - Cyan
+      { sequence: [0, 9, 10, 19, 20, 0], color: "#3396D3" }                 // Trip 4 - Yellow
+    ];
+  </script>
+
+  <!-- MarkerClusterer -->
+  <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
+
+  <script>
+    let map, markers = [], infoWindows = [], clusterer = null, polyline = null, route1Polylines = [], route2Polylines = [];
+    let darkMode = false, showPath = false, useCluster = false, showRoute1 = false, showRoute2 = false, useRealRoads = false;
+    let directionsService;
+
+    const nightStyle = [
+      { elementType: "geometry", stylers: [{ color: "#1f0000" }] },
+      { elementType: "labels.text.stroke", stylers: [{ color: "#1f2a44" }] },
+      { elementType: "labels.text.fill", stylers: [{ color: "#e9edf5" }] },
+      { featureType: "poi", stylers: [{ visibility: "off" }] },
+      { featureType: "transit", stylers: [{ visibility: "off" }] },
+      { featureType: "road", elementType:"geometry", stylers:[{ color:"#1f0000"}]},
+      { featureType: "water", stylers: [{ color: "#0b1220" }] }
+    ];
+
+    const iconSVG = (color="#00ABD0") =>
+      "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`
+        <svg xmlns='http://www.w3.org/2000/svg' width='36' height='36' viewBox='0 0 36 36'>
+          <g fill='none' fill-rule='evenodd'>
+            <circle cx='18' cy='18' r='10' fill='${color}' opacity='0.18'/>
+            <path d='M18 7c-3.86 0-7 3.14-7 7 0 5.25 7 15 7 15s7-9.75 7-15c0-3.86-3.14-7-7-7z' fill='${color}'/>
+            <circle cx='18' cy='14' r='3.5' fill='white'/>
+          </g>
+        </svg>`);
+
+    function initMap(){
+      map = new google.maps.Map(document.getElementById("map"), {
+        center: {lat: LOCATIONS[0].lat, lng: LOCATIONS[0].lng},
+        zoom: 9,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: true,
+      });
+      if (darkMode) map.setOptions({styles: nightStyle});
+
+      // Initialize Directions Service
+      directionsService = new google.maps.DirectionsService();
+
+      renderMarkers(LOCATIONS);
+      renderPolyline();
+      renderRoute1Polylines();
+      renderRoute2Polylines();
+      fitBounds();
+
+      setupUI();
+      renderList(LOCATIONS);
+    }
+
+    function renderMarkers(data){
+      // Clear previous
+      markers.forEach(m => m.setMap(null));
+      markers = [];
+      infoWindows.forEach(i => i.close());
+      infoWindows = [];
+      if (clusterer){ clusterer.clearMarkers(); clusterer = null; }
+
+      data.forEach(p => {
+
+        if (p.code == 0){
+          icon= { url: iconSVG("#0000AB"), scaledSize: new google.maps.Size(48,48), anchor: new google.maps.Point(18,30) }
+        }
+        else if (ROUTE1_SEQUENCES.some(r => r.sequence.includes(p.code))){
+          icon= { url: iconSVG("#AB0000"), scaledSize: new google.maps.Size(36,36), anchor: new google.maps.Point(18,30) }
+        }
+        else if (ROUTE2_SEQUENCES.some(r => r.sequence.includes(p.code))){
+          icon= { url: iconSVG("#AB0000"), scaledSize: new google.maps.Size(36,36), anchor: new google.maps.Point(18,30) }
+        }
+        else {
+          icon= { url: iconSVG("#AB0000"), scaledSize: new google.maps.Size(36,36), anchor: new google.maps.Point(18,30) }
+        }
+        
+        const marker = new google.maps.Marker({
+          position: {lat:p.lat, lng:p.lng},
+          title: `Code ${p.code}`,
+          icon: icon
+        });
+        const info = new google.maps.InfoWindow({
+          content: `
+            <div style="min-width:220px;font-family:Inter;">
+              <div style="font-weight:800;margin-bottom:6px;">Code ${p.code}</div>
+              <div><b>Lat:</b> ${p.lat.toFixed(6)}</div>
+              <div><b>Lng:</b> ${p.lng.toFixed(6)}</div>
+            </div>`
+        });
+        marker.addListener("click", () => {
+          infoWindows.forEach(i => i.close());
+          info.open(map, marker);
+        });
+        marker.setMap(map);
+        markers.push(marker);
+        infoWindows.push(info);
+      });
+
+      if (useCluster) {
+        // eslint-disable-next-line no-undef
+        clusterer = new markerClusterer.MarkerClusterer({ map, markers });
+      }
+    }
+
+    function renderPolyline(){
+      if (polyline){ polyline.setMap(null); polyline = null; }
+      if (!showPath) return;
+      polyline = new google.maps.Polyline({
+        path: LOCATIONS.map(p => ({lat:p.lat, lng:p.lng})),
+        geodesic: true,
+        strokeOpacity: 1,
+        strokeWeight: 3,
+        strokeColor: "#00ABD0",
+      });
+      polyline.setMap(map);
+    }
+
+    function renderRoute1DirectionsRoute(){
+      route1Polylines.forEach(p => p.setMap(null));
+      route1Polylines = [];
+      if (!showRoute1) return;
+      ROUTE1_SEQUENCES.forEach((r, index) => {
+        renderDirectionsRoute(r.sequence, r.color, `route1_${index}`);
+      });
+      document.getElementById("route1Legend").style.display = "block";
+    }
+
+    function renderRoute2DirectionsRoute(){
+      route2Polylines.forEach(p => p.setMap(null));
+      route2Polylines = [];
+      if (!showRoute2) return;
+      ROUTE2_SEQUENCES.forEach((r, index) => {
+        renderDirectionsRoute(r.sequence, r.color, `route2_${index}`);
+      });
+      document.getElementById("route2Legend").style.display = "block";
+    }
+
+    function renderDirectionsRoute(sequence, color, routeId) {
+      if (sequence.length < 2) return;
+
+      const origin = LOCATIONS.find(p => p.code === sequence[0]);
+      const destination = LOCATIONS.find(p => p.code === sequence[sequence.length - 1]);
+      const waypoints = sequence.slice(1, -1).map(code => ({
+        location: new google.maps.LatLng(
+          LOCATIONS.find(p => p.code === code).lat,
+          LOCATIONS.find(p => p.code === code).lng
+        ),
+        stopover: true
+      }));
+
+      const request = {
+        origin: new google.maps.LatLng(origin.lat, origin.lng),
+        destination: new google.maps.LatLng(destination.lat, destination.lng),
+        waypoints: waypoints,
+        travelMode: useRealRoads ? google.maps.TravelMode.DRIVING : google.maps.TravelMode.WALKING,
+        optimizeWaypoints: false
+      };
+
+      directionsService.route(request, (result, status) => {
+        if (status === 'OK') {
+          const directionsRenderer = new google.maps.DirectionsRenderer({
+            directions: result,
+            map: map,
+            suppressMarkers: true,
+            polylineOptions: {
+              strokeColor: color,
+              strokeWeight: 4,
+              strokeOpacity: 1,
+              icons: [{
+                icon: {
+                  path: google.maps.SymbolPath.FORWARD_OPEN_ARROW,
+                  scale: 3,
+                  fillColor: color,
+                  fillOpacity: 1,
+                  strokeColor: '#FFFFFF',
+                  strokeWeight: 1
+                },
+                offset: '100px',
+                repeat: '300px'
+              }]
+            }
+          });
+          
+          if (routeId.startsWith('route1')) {
+            route1Polylines.push(directionsRenderer);
+          } else {
+            route2Polylines.push(directionsRenderer);
+          }
+        } else {
+          console.warn('Directions request failed due to ' + status);
+          // Fallback to straight line if directions fail
+          const polyline = new google.maps.Polyline({
+            path: sequence.map(c => LOCATIONS.find(p => p.code == c)).map(p => ({lat:p.lat, lng:p.lng})),
+            geodesic: true,
+            strokeOpacity: 1,
+            strokeWeight: 4,
+            strokeColor: color,
+            icons: [{
+              icon: {
+                path: google.maps.SymbolPath.FORWARD_OPEN_ARROW,
+                scale: 3,
+                fillColor: color,
+                fillOpacity: 1,
+                strokeColor: '#FFFFFF',
+                strokeWeight: 1
+              },
+              offset: '100px',
+              repeat: '300px'
+            }]
+          });
+          polyline.setMap(map);
+          
+          if (routeId.startsWith('route1')) {
+            route1Polylines.push(polyline);
+          } else {
+            route2Polylines.push(polyline);
+          }
+        }
+      });
+    }
+
+    function renderRoute1Polylines(){
+      route1Polylines.forEach(p => p.setMap(null));
+      route1Polylines = [];
+      if (!showRoute1) return;
+      ROUTE1_SEQUENCES.forEach(r => {
+        const polyline = new google.maps.Polyline({
+          path: r.sequence.map(c => LOCATIONS.find(p => p.code == c)).map(p => ({lat:p.lat, lng:p.lng})),
+          geodesic: true,
+          strokeOpacity: 1,
+          strokeWeight: 4,
+          strokeColor: r.color,
+          icons: [{
+            icon: {
+              path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+              scale: 4,
+              fillColor: r.color,
+              fillOpacity: 1,
+              strokeColor: '#FFFFFF',
+              strokeWeight: 1
+            },
+            repeat: '100px'
+          }]
+        });
+        polyline.setMap(map);
+        route1Polylines.push(polyline);
+      });
+      document.getElementById("route1Legend").style.display = "block";
+    }
+
+    function renderRoute2Polylines(){
+      route2Polylines.forEach(p => p.setMap(null));
+      route2Polylines = [];
+      if (!showRoute2) return;
+      ROUTE2_SEQUENCES.forEach(r => {
+        const polyline = new google.maps.Polyline({
+          path: r.sequence.map(c => LOCATIONS.find(p => p.code == c)).map(p => ({lat:p.lat, lng:p.lng})),
+          geodesic: true,
+          strokeOpacity: 1,
+          strokeWeight: 4,
+          strokeColor: r.color,
+          icons: [{
+            icon: {
+              path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+              scale: 4,
+              fillColor: r.color,
+              fillOpacity: 1,
+              strokeColor: '#FFFFFF',
+              strokeWeight: 1
+            },
+            repeat: '100px'
+          }]
+        });
+        polyline.setMap(map);
+        route2Polylines.push(polyline);
+      });
+      document.getElementById("route2Legend").style.display = "block";
+    }
+
+
+
+    function fitBounds(){
+      const bounds = new google.maps.LatLngBounds();
+      (markers.length ? markers : LOCATIONS).forEach(p => {
+        const pos = p.position ? p.position : new google.maps.LatLng(p.lat, p.lng);
+        bounds.extend(pos);
+      });
+      map.fitBounds(bounds, 60);
+    }
+
+    function setupUI(){
+      const q = document.getElementById("search");
+      const darkBtn = document.getElementById("darkBtn");
+      const pathBtn = document.getElementById("pathBtn");
+      //const clusterBtn = document.getElementById("clusterBtn");
+      const route1Btn = document.getElementById("route1Btn");
+      const route2Btn = document.getElementById("route2Btn");
+      const fitBtn = document.getElementById("fitBtn");
+      const resetBtn = document.getElementById("resetBtn");
+      const navModeBtn = document.getElementById("navModeBtn");
+
+      q.addEventListener("input", () => {
+        const term = q.value.trim().toLowerCase();
+        const filtered = LOCATIONS.filter(p => {
+          const code = String(p.code);
+          return code.includes(term) ||
+                 p.lat.toString().toLowerCase().includes(term) ||
+                 p.lng.toString().toLowerCase().includes(term);
+        });
+        renderMarkers(filtered);
+        renderList(filtered);
+      });
+
+      darkBtn.addEventListener("click", () => {
+        darkMode = !darkMode;
+        document.body.classList.toggle("dark", darkMode);
+        map.setOptions({styles: darkMode ? nightStyle : null});
+        darkBtn.classList.toggle("active", darkMode);
+      });
+
+      /*pathBtn.addEventListener("click", () => {
+        showPath = !showPath;
+        pathBtn.classList.toggle("active", showPath);
+        renderPolyline();
+      });
+
+      clusterBtn.addEventListener("click", () => {
+        useCluster = !useCluster;
+        clusterBtn.classList.toggle("active", useCluster);
+        renderMarkers(currentList());
+      });*/
+
+      route1Btn.addEventListener("click", () => {
+        showRoute1 = !showRoute1;
+        route1Btn.classList.toggle("active", showRoute1);
+        renderRoute1Polylines();
+        document.getElementById("route1Legend").style.display = showRoute1 ? "block" : "none";
+        renderMarkers(currentList());
+      });
+
+      route2Btn.addEventListener("click", () => {
+        showRoute2 = !showRoute2;
+        route2Btn.classList.toggle("active", showRoute2);
+        renderRoute2Polylines();
+        document.getElementById("route2Legend").style.display = showRoute2 ? "block" : "none";
+        renderMarkers(currentList());
+      });
+
+      navModeBtn.addEventListener("click", () => {
+        useRealRoads = !useRealRoads;
+        navModeBtn.classList.toggle("active", useRealRoads);
+        if (useRealRoads) {
+          renderRoute1DirectionsRoute();
+          renderRoute2DirectionsRoute();
+        } else {
+          renderRoute1Polylines();
+          renderRoute2Polylines();
+        }
+        document.getElementById("navModeText").textContent = useRealRoads ? "Navigation Routing" : "Straight Line";
+      });
+
+      fitBtn.addEventListener("click", fitBounds);
+
+      resetBtn.addEventListener("click", () => {
+        q.value = "";
+        showPath = true; pathBtn.classList.add("active");
+        useCluster = true; clusterBtn.classList.add("active");
+        showRoute1 = false; route1Btn.classList.remove("active");
+        showRoute2 = false; route2Btn.classList.remove("active");
+        useRealRoads = false; navModeBtn.classList.remove("active");
+        document.getElementById("navModeText").textContent = "Straight Line";
+        renderMarkers(LOCATIONS);
+        renderPolyline();
+        renderRoute1Polylines();
+        renderRoute2Polylines();
+        renderList(LOCATIONS);
+        fitBounds();
+      });
+    }
+
+    function currentList(){
+      const items = document.querySelectorAll(".card");
+      const codes = Array.from(items).map(el => Number(el.dataset.code));
+      return LOCATIONS.filter(p => codes.includes(p.code));
+    }
+
+    function renderList(data){
+      const container = document.getElementById("list");
+      const count = document.getElementById("count");
+      container.innerHTML = "";
+      count.textContent = `(${data.length} shown)`;
+
+      data.forEach(p => {
+        const el = document.createElement("div");
+        el.className = "card";
+        el.dataset.code = p.code;
+        el.innerHTML = `
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:10px;height:10px;border-radius:50%;background:#00ABD0;box-shadow:0 0 12px rgba(0,171,208,.7)"></div>
+            <div style="font-weight:700;">Code ${p.code}</div>
+          </div>
+          <div class="small" style="margin-top:6px;">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</div>
+        `;
+        el.addEventListener("click", () => {
+          const m = markers.find(mm => (mm.getTitle()||"").endsWith(` ${p.code}`));
+          if (!m) return;
+          map.panTo(m.getPosition());
+          map.setZoom(Math.max(map.getZoom(), 12));
+          google.maps.event.trigger(m, "click");
+        });
+        container.appendChild(el);
+      });
+    }
+  </script>
+
+  <!-- Google Maps API: replace YOUR_API_KEY_HERE -->
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD6KDiD-t5U1LUxSyNGqZoKgeyqwL6wNzY&callback=initMap"></script>
+</body>
+</html>
