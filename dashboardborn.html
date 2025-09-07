@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard ข้อมูลเด็กแรกเกิด ต.ท่าคันโท อ.ท่าคันโท จ.กาฬสินธุ์</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #f1f5f9;
+        }
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        .tab-button {
+            transition: all 0.3s ease;
+        }
+        .tab-button.active {
+            color: #2563eb; /* blue-600 */
+            border-bottom-color: #2563eb;
+        }
+        select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.5rem center;
+            background-size: 1.5em 1.5em;
+            padding-right: 2.5rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app" class="p-4 sm:p-6 lg:p-8">
+        <!-- Header -->
+        <header class="flex flex-wrap justify-between items-center gap-4 mb-6">
+            <h1 class="text-2xl sm:text-3xl font-bold text-slate-800">Dashboard ข้อมูลเด็กแรกเกิด ต.ท่าคันโท อ.ท่าคันโท จ.กาฬสินธุ์</h1>
+        </header>
+
+        <!-- Initial Upload Prompt -->
+        <div id="upload-prompt" class="flex flex-col items-center justify-center text-center p-12 bg-white rounded-lg shadow-md border-2 border-dashed border-slate-300">
+             <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-up text-slate-400 mb-4"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M12 12v-6"/><path d="m15 9-3-3-3 3"/><path d="M10 9H8"/></svg>
+            <h2 class="text-xl font-semibold text-slate-700">กรุณาอัปโหลดไฟล์ CSV</h2>
+            <p class="text-slate-500 mt-2">เลือกไฟล์ข้อมูลของคุณเพื่อเริ่มต้นการแสดงผลบนแดชบอร์ด</p>
+        </div>
+
+        <!-- Dashboard Content (hidden by default) -->
+        <main id="dashboard-content" class="hidden">
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                <div class="bg-white p-6 rounded-xl shadow-md flex items-center gap-4">
+                    <div class="bg-blue-100 p-3 rounded-full"><i data-lucide="users" class="text-blue-600"></i></div>
+                    <div>
+                        <p class="text-sm text-slate-500">จำนวนเด็กทั้งหมด</p>
+                        <p id="total-records" class="text-2xl font-bold text-slate-800">0</p>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-md flex items-center gap-4">
+                    <div class="bg-green-100 p-3 rounded-full"><i data-lucide="map" class="text-green-600"></i></div>
+                    <div>
+                        <p class="text-sm text-slate-500">จำนวนจังหวัด</p>
+                        <p id="total-provinces" class="text-2xl font-bold text-slate-800">0</p>
+                    </div>
+                 </div>
+                 <div class="bg-white p-6 rounded-xl shadow-md flex items-center gap-4">
+                    <div class="bg-yellow-100 p-3 rounded-full"><i data-lucide="home" class="text-yellow-600"></i></div>
+                    <div>
+                        <p class="text-sm text-slate-500">จำนวนหน่วยงาน</p>
+                        <p id="total-agencies" class="text-2xl font-bold text-slate-800">0</p>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-md flex items-center gap-4">
+                    <div class="bg-red-100 p-3 rounded-full"><i data-lucide="check-circle" class="text-red-600"></i></div>
+                    <div>
+                        <p class="text-sm text-slate-500">มีสิทธิรับเงินอุดหนุน</p>
+                        <p id="total-eligible" class="text-2xl font-bold text-slate-800">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="border-b border-slate-200 mb-6">
+                <nav id="tab-nav" class="-mb-px flex space-x-6 overflow-x-auto" aria-label="Tabs">
+                    <!-- Tab buttons will be injected here by JS -->
+                </nav>
+            </div>
+            
+            <!-- Tab Content -->
+            <div id="tab-content">
+                <!-- Content for each tab will be injected here by JS -->
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // --- DOM Elements ---
+        const uploadPrompt = document.getElementById('upload-prompt');
+        const dashboardContent = document.getElementById('dashboard-content');
+        const tabNav = document.getElementById('tab-nav');
+        const tabContent = document.getElementById('tab-content');
+
+        // --- State Management ---
+        const state = {
+            fullData: [],
+            filteredData: [],
+            activeTab: 'overview',
+            timeFilter: 'month',
+            currentPage: 1,
+            rowsPerPage: 10,
+            charts: {}, // To hold chart instances
+            tabs: [
+                { id: 'overview', label: 'ภาพรวม' },
+                { id: 'demographics', label: 'ข้อมูลประชากร' },
+                { id: 'location', label: 'ข้อมูลเชิงพื้นที่' },
+                { id: 'table', label: 'ตารางข้อมูล' },
+                { id: 'database', label: 'การจัดการฐานข้อมูล' },
+            ],
+            timeFilterOptions: [
+                { id: 'week', label: 'สัปดาห์' },
+                { id: 'month', label: 'เดือน' },
+                { id: 'year', label: 'ปี' },
+            ]
+        };
+
+        // --- Event Listeners ---
+        // Auto-load data when page loads
+        window.addEventListener('load', () => {
+            const defaultUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQSThQkdYyVG7ys62st0vKG163oSfVVNeafJHim3Va2XxhjK0p9DKmd_YdAHnGjFMPUzmYQZ3wiw_Ad/pub?gid=0&single=true&output=csv';
+            loadSpreadsheetData(defaultUrl, null, true);
+        });
+
+        // --- Functions ---
+        function initializeDashboard(data) {
+            state.fullData = data;
+            state.filteredData = [...data];
+            uploadPrompt.classList.add('hidden');
+            dashboardContent.classList.remove('hidden');
+            
+            updateStats();
+            renderTabs();
+            renderContent();
+        }
+
+        function updateStats(data = null) {
+            const dataToUse = data || state.fullData;
+            const provinces = new Set(dataToUse.map(row => row['จังหวัด']));
+            const agencies = new Set(dataToUse.map(row => row['หน่วยงานลงทะเบียน']));
+            const eligible = dataToUse.filter(row => row['สถานะลงทะเบียน'] === 'มีสิทธิรับเงินอุดหนุน').length;
+
+            document.getElementById('total-records').textContent = dataToUse.length.toLocaleString();
+            document.getElementById('total-provinces').textContent = provinces.size.toLocaleString();
+            document.getElementById('total-agencies').textContent = agencies.size.toLocaleString();
+            document.getElementById('total-eligible').textContent = eligible.toLocaleString();
+        }
+
+        function renderTabs() {
+            tabNav.innerHTML = '';
+            state.tabs.forEach(tab => {
+                const button = document.createElement('button');
+                button.id = `tab-${tab.id}`;
+                button.className = `tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-slate-500 hover:text-slate-700 hover:border-slate-300 ${state.activeTab === tab.id ? 'active' : ''}`;
+                button.textContent = tab.label;
+                button.onclick = () => {
+                    state.activeTab = tab.id;
+                    renderTabs(); // Re-render tabs to update active class
+                    renderContent();
+                };
+                tabNav.appendChild(button);
+            });
+        }
+        
+        function renderContent() {
+            // Destroy all previous charts to prevent memory leaks
+            Object.values(state.charts).forEach(chart => chart.destroy());
+            state.charts = {};
+            
+            tabContent.innerHTML = ''; // Clear previous content
+
+            switch (state.activeTab) {
+                case 'overview':
+                    renderOverviewContent();
+                    break;
+                case 'demographics':
+                    renderDemographicsContent();
+                    break;
+                case 'location':
+                    renderLocationContent();
+                    break;
+                case 'table':
+                    renderTableContent();
+                    break;
+                case 'database':
+                    renderDatabaseContent();
+                    break;
+            }
+        }
+        
+        // --- Tab Specific Render Functions ---
+        
+        function renderOverviewContent() {
+            tabContent.innerHTML = `
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+                        <h3 class="font-bold text-lg text-slate-800">จำนวนเด็กแรกเกิด ตามช่วงเวลา</h3>
+                        <div id="time-filter-buttons" class="flex items-center rounded-lg bg-slate-100 p-1 text-sm flex-shrink-0">
+                            <!-- Buttons will be injected here -->
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="time-series-chart"></canvas>
+                    </div>
+                </div>
+            `;
+            setupTimeFilterButtons();
+            createTimeSeriesChart();
+        }
+
+
+        function renderDemographicsContent() {
+             tabContent.innerHTML = `
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h3 class="font-bold text-lg text-slate-800 mb-4">การกระจายตัวตามอายุ (ปี)</h3>
+                    <div class="chart-container">
+                        <canvas id="age-chart"></canvas>
+                    </div>
+                </div>
+            `;
+            createAgeChart();
+        }
+
+        function renderLocationContent() {
+             tabContent.innerHTML = `
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Chart Section -->
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                        <h3 class="font-bold text-lg text-slate-800 mb-4">จำนวนเด็กในแต่ละตำบล (15 อันดับแรก)</h3>
+                        <div class="chart-container">
+                            <canvas id="tambon-chart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Google Maps Section -->
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                        <h3 class="font-bold text-lg text-slate-800 mb-4">🗺️ แผนที่การกระจายที่อยู่อาศัย</h3>
+                        <div id="map-container" style="height: 400px; border-radius: 8px; overflow: hidden; position: relative;">
+                            <div id="loading-map" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; z-index: 1000;">
+                                <div style="color: #6c757d;">🔄 กำลังโหลดแผนที่...</div>
+                            </div>
+                            <div id="map" style="width: 100%; height: 100%;"></div>
+                        </div>
+                        <div class="mt-4 text-sm text-slate-600">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="w-3 h-3 bg-red-500 rounded-full"></span>
+                                <span>จำนวนเด็กมาก (≥30 คน)</span>
+                            </div>
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="w-3 h-3 bg-yellow-500 rounded-full"></span>
+                                <span>จำนวนเด็กปานกลาง (10-29 คน)</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="w-3 h-3 bg-green-500 rounded-full"></span>
+                                <span>จำนวนเด็กน้อย (<10 คน)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Village List Section -->
+                <div class="bg-white p-6 rounded-xl shadow-md mt-6">
+                    <h3 class="font-bold text-lg text-slate-800 mb-4">🏘️ รายการหมู่บ้าน</h3>
+                    <div class="mb-4">
+                        <input type="text" id="village-search" placeholder="🔍 ค้นหาหมู่บ้าน..." class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                    </div>
+                    <div id="village-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-96 overflow-y-auto">
+                        <!-- Village items will be populated by JavaScript -->
+                    </div>
+                </div>
+            `;
+            createTambonChart();
+            initializeMap();
+        }
+
+        function renderTableContent() {
+            tabContent.innerHTML = `
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                     <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
+                        <h3 class="font-bold text-lg text-slate-800">ข้อมูลทั้งหมด</h3>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                        <select id="year-filter" class="w-full bg-white border border-slate-300 rounded-lg p-2 text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></select>
+                        <select id="province-filter" class="w-full bg-white border border-slate-300 rounded-lg p-2 text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></select>
+                        <select id="district-filter" class="w-full bg-white border border-slate-300 rounded-lg p-2 text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></select>
+                        <select id="tambon-filter" class="w-full bg-white border border-slate-300 rounded-lg p-2 text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></select>
+                    </div>
+                    <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
+                        <div class="relative w-full sm:w-auto">
+                            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5"></i>
+                            <input type="text" id="table-search" placeholder="ค้นหา..." class="pl-10 pr-4 py-2 border border-slate-300 rounded-lg w-full sm:w-64 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm">
+                        </div>
+                         <button id="clear-filters-btn" class="inline-flex items-center gap-2 px-4 py-2 bg-slate-200 text-slate-700 font-semibold rounded-lg hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 transition-colors">
+                            <i data-lucide="x"></i>
+                            <span>ล้างตัวกรอง</span>
+                         </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-600">
+                            <thead id="table-head" class="text-xs text-slate-700 uppercase bg-slate-100"></thead>
+                            <tbody id="table-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="flex justify-between items-center mt-4 text-sm text-slate-600">
+                        <span id="table-info"></span>
+                        <div class="inline-flex mt-2 xs:mt-0">
+                            <button id="prev-page" class="px-4 py-2 text-sm font-medium text-white bg-slate-800 rounded-l hover:bg-slate-900">ก่อนหน้า</button>
+                            <button id="next-page" class="px-4 py-2 text-sm font-medium text-white bg-slate-800 border-0 border-l border-slate-700 rounded-r hover:bg-slate-900">ถัดไป</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            lucide.createIcons(); // Re-create icons
+            setupTable();
+        }
+
+        function renderDatabaseContent() {
+            tabContent.innerHTML = `
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h3 class="font-bold text-lg text-slate-800 mb-4">การจัดการฐานข้อมูล</h3>
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-slate-700 mb-2">URL ของ Google Sheets</label>
+                        <div class="flex gap-2">
+                            <input type="url" id="sheets-url" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vQSThQkdYyVG7ys62st0vKG163oSfVVNeafJHim3Va2XxhjK0p9DKmd_YdAHnGjFMPUzmYQZ3wiw_Ad/pub?gid=0&single=true&output=csv" class="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm">
+                            <button id="load-sheets" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-transform transform hover:scale-105">
+                                <i data-lucide="download"></i>
+                                <span>โหลดข้อมูล</span>
+                            </button>
+                        </div>
+                        <p class="text-sm text-slate-500 mt-2">ใส่ URL ของ Google Sheets ที่ได้เผยแพร่แล้วเพื่อโหลดข้อมูลใหม่</p>
+                    </div>
+                    <div class="bg-blue-50 p-4 rounded-lg text-sm text-blue-800">
+                        <p class="font-semibold mb-2">วิธีการเผยแพร่ Google Sheets:</p>
+                        <ol class="list-decimal list-inside space-y-1">
+                            <li>เปิด Google Sheets ของคุณ</li>
+                            <li>ไปที่ File → Share → Publish to web</li>
+                            <li>เลือก Sheet ที่ต้องการ</li>
+                            <li>เลือกรูปแบบ "Web page" หรือ "CSV"</li>
+                            <li>คลิก Publish และคัดลอก URL</li>
+                        </ol>
+                    </div>
+                </div>
+            `;
+            lucide.createIcons();
+            
+            // Add event listener for the load button
+            const loadSheetsButton = document.getElementById('load-sheets');
+            const sheetsUrlElement = document.getElementById('sheets-url');
+            
+            loadSheetsButton.addEventListener('click', () => {
+                handleLoadSheets(sheetsUrlElement, loadSheetsButton);
+            });
+        }
+
+        function handleLoadSheets(sheetsUrlElement, loadSheetsButton) {
+            const url = sheetsUrlElement.value.trim();
+            if (url) {
+                // Show loading state
+                loadSheetsButton.disabled = true;
+                loadSheetsButton.innerHTML = '<i data-lucide="loader-2" class="animate-spin"></i><span>กำลังโหลด...</span>';
+                lucide.createIcons();
+                
+                loadSpreadsheetData(url, loadSheetsButton);
+            } else {
+                alert('กรุณาใส่ URL ของ Google Sheets');
+            }
+        }
+
+        function loadSpreadsheetData(url, loadSheetsButton, autoLoad = false) {
+            // Use the URL directly if it's already a CSV export URL
+            let csvUrl = url;
+            
+            // Convert regular Google Sheets URLs to CSV export format if needed
+            if (url.includes('/edit')) {
+                csvUrl = url.replace('/edit#gid=', '/export?format=csv&gid=').replace('/edit', '/export?format=csv');
+            } else if (url.includes('spreadsheets.google.com') && url.includes('/d/') && !url.includes('export') && !url.includes('pub')) {
+                // Extract spreadsheet ID and convert to CSV export URL
+                const spreadsheetId = url.match(/\/d\/([^\/]+)/);
+                if (spreadsheetId) {
+                    csvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId[1]}/export?format=csv`;
+                }
+            }
+
+            // Try direct fetch first, then fallback to CORS proxy if needed
+            const fetchWithFallback = async (url) => {
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    return response;
+                } catch (error) {
+                    // If CORS error, try with a CORS proxy
+                    if (error.message.includes('CORS') || error.name === 'TypeError') {
+                        console.log('CORS error detected, trying with proxy...');
+                        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+                        const proxyResponse = await fetch(proxyUrl);
+                        if (!proxyResponse.ok) {
+                            throw new Error('ไม่สามารถเข้าถึง Google Sheets ได้ กรุณาตรวจสอบว่าได้เผยแพร่ไฟล์แล้ว');
+                        }
+                        return proxyResponse;
+                    }
+                    throw error;
+                }
+            };
+
+            fetchWithFallback(csvUrl)
+                .then(response => response.text())
+                .then(csvText => {
+                    Papa.parse(csvText, {
+                        header: true,
+                        encoding: "UTF-8",
+                        skipEmptyLines: true,
+                        complete: (results) => {
+                            if (results.data && results.data.length > 0) {
+                                initializeDashboard(results.data);
+                                if (!autoLoad) {
+                                    // Switch to overview tab after manual loading
+                                    state.activeTab = 'overview';
+                                    renderTabs();
+                                    renderContent();
+                                }
+                            } else {
+                                throw new Error('ไม่พบข้อมูลใน Google Sheets');
+                            }
+                        },
+                        error: (error) => {
+                            throw new Error('เกิดข้อผิดพลาดในการอ่านข้อมูล: ' + error.message);
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading spreadsheet data:', error);
+                    if (!autoLoad) {
+                        alert(error.message || 'เกิดข้อผิดพลาดในการโหลดข้อมูลจาก Google Sheets');
+                    }
+                })
+                .finally(() => {
+                    // Reset button state
+                    if (loadSheetsButton) {
+                        loadSheetsButton.disabled = false;
+                        loadSheetsButton.innerHTML = '<i data-lucide="download"></i><span>โหลดข้อมูล</span>';
+                        lucide.createIcons();
+                    }
+                });
+        }
+
+        // --- Helper Functions ---
+        function parseDate(dateString) {
+            if (!dateString || typeof dateString !== 'string') return null;
+            const parts = dateString.split('/');
+            if (parts.length !== 3) return null;
+            const day = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
+            const year = parseInt(parts[2], 10);
+            if (isNaN(day) || isNaN(month) || isNaN(year) || year < 1900) return null;
+            const date = new Date(year, month, day);
+            if (date.getFullYear() === year && date.getMonth() === month && date.getDate() === day) {
+                return date;
+            }
+            return null;
+        }
+
+        // --- Chart Creation Functions ---
+        function setupTimeFilterButtons() {
+            const container = document.getElementById('time-filter-buttons');
+            container.innerHTML = '';
+            state.timeFilterOptions.forEach(opt => {
+                const button = document.createElement('button');
+                button.className = `px-3 py-1 rounded-md transition-colors font-medium ${state.timeFilter === opt.id ? 'bg-white text-blue-600 shadow' : 'text-slate-600 hover:bg-slate-200'}`;
+                button.textContent = opt.label;
+                button.onclick = () => {
+                    state.timeFilter = opt.id;
+                    setupTimeFilterButtons(); 
+                    createTimeSeriesChart();
+                };
+                container.appendChild(button);
+            });
+        }
+        
+        function createTimeSeriesChart() {
+            if (state.charts.timeSeries) state.charts.timeSeries.destroy();
+
+            const getGroupKey = (date, filter) => {
+                switch (filter) {
+                    case 'year':
+                        return date.getFullYear().toString();
+                    case 'month':
+                        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                    case 'week':
+                        const firstDayOfWeek = new Date(date);
+                        firstDayOfWeek.setDate(date.getDate() - date.getDay());
+                        return `${firstDayOfWeek.getFullYear()}-${String(firstDayOfWeek.getMonth() + 1).padStart(2, '0')}-${String(firstDayOfWeek.getDate()).padStart(2, '0')}`;
+                }
+            };
+
+            const counts = state.fullData.reduce((acc, row) => {
+                const date = parseDate(row['วัน/เดือน/ปีเกิดของเด็กแรกเกิด']);
+                if (date) {
+                    const key = getGroupKey(date, state.timeFilter);
+                    acc[key] = (acc[key] || 0) + 1;
+                }
+                return acc;
+            }, {});
+
+            const sortedKeys = Object.keys(counts).sort();
+            const labels = sortedKeys;
+            const data = sortedKeys.map(key => counts[key]);
+
+            state.charts.timeSeries = new Chart(document.getElementById('time-series-chart'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            type: 'line',
+                            label: 'แนวโน้ม',
+                            data: data,
+                            borderColor: 'rgba(234, 88, 12, 1)',
+                            backgroundColor: 'rgba(234, 88, 12, 0.2)',
+                            fill: true,
+                            tension: 0.3,
+                        },
+                        {
+                            type: 'bar',
+                            label: 'จำนวนเด็ก',
+                            data: data,
+                            backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        },
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true },
+                        x: { grid: { display: false } }
+                    },
+                    plugins: {
+                        legend: { display: true, position: 'top' }
+                    },
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                }
+            });
+        }
+        
+        function createAgeChart() {
+            const ageCounts = state.fullData.reduce((acc, row) => {
+                const ageString = row['อายุเด็กแรกเกิด'];
+                if(ageString) {
+                    const yearMatch = ageString.match(/(\d+)\s*ปี/);
+                    if (yearMatch && yearMatch[1]) {
+                        const year = parseInt(yearMatch[1], 10);
+                        acc[year] = (acc[year] || 0) + 1;
+                    }
+                }
+                return acc;
+            }, {});
+            const sortedAges = Object.entries(ageCounts).sort(([a], [b]) => a - b);
+            state.charts.age = new Chart(document.getElementById('age-chart'), {
+                type: 'bar',
+                data: {
+                    labels: sortedAges.map(([year]) => `${year} ปี`),
+                    datasets: [{
+                        label: 'จำนวนเด็ก',
+                        data: sortedAges.map(([, count]) => count),
+                        backgroundColor: 'rgba(22, 163, 74, 0.7)',
+                        borderColor: '#16a34a',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+            });
+        }
+
+        function createTambonChart() {
+            const tambonCounts = state.fullData.reduce((acc, row) => {
+                const tambon = row['ตำบล'];
+                if (tambon) acc[tambon] = (acc[tambon] || 0) + 1;
+                return acc;
+            }, {});
+            const sortedTambons = Object.entries(tambonCounts).sort(([, a], [, b]) => b - a).slice(0, 15);
+            state.charts.tambon = new Chart(document.getElementById('tambon-chart'), {
+                type: 'bar',
+                data: {
+                    labels: sortedTambons.map(p => p[0]),
+                    datasets: [{
+                        label: 'จำนวนเด็ก',
+                        data: sortedTambons.map(p => p[1]),
+                        backgroundColor: 'rgba(124, 58, 237, 0.7)',
+                        borderColor: '#7c3aed',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+            });
+        }
+
+        function initializeMap() {
+            const mapContainer = document.getElementById('map-container');
+            const loadingMap = document.getElementById('loading-map');
+            const mapElement = document.getElementById('map');
+
+            // Initialize Google Maps
+            const apiKey = 'AIzaSyD6KDiD-t5U1LUxSyNGqZoKgeyqwL6wNzY';
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=initGoogleMap`;
+            script.async = true;
+            script.defer = true;
+            document.head.appendChild(script);
+
+            window.initGoogleMap = function() {
+                const mapOptions = {
+                    center: { lat: 16.4419, lng: 103.3419 }, // ท่าคันโท coordinates
+                    zoom: 12,
+                    mapTypeId: 'roadmap'
+                };
+
+                const googleMap = new google.maps.Map(mapElement, mapOptions);
+
+                // Extract village data from the dataset
+                const villageData = state.fullData.reduce((acc, row) => {
+                    const tambon = row['ตำบล'];
+                    const village = row['หมู่ที่'] || row['หมู่บ้าน'] || row['หมู่'] || 'ไม่ระบุหมู่';
+                    
+                    if (tambon && village) {
+                        const key = `${tambon} - ${village}`;
+                        if (!acc[key]) {
+                            acc[key] = {
+                                tambon: tambon,
+                                village: village,
+                                count: 0,
+                                children: []
+                            };
+                        }
+                        acc[key].count++;
+                        acc[key].children.push(row);
+                    }
+                    return acc;
+                }, {});
+
+                // Sample coordinates for villages (you can replace with actual coordinates)
+                // Format: 'tambon - village': coordinates
+                const villageCoordinates = {
+                    'ท่าคันโท - หมู่ที่ 1': { lat: 16.4419, lng: 103.3419 },
+                    'ท่าคันโท - หมู่ที่ 2': { lat: 16.4450, lng: 103.3350 },
+                    'ท่าคันโท - หมู่ที่ 3': { lat: 16.4380, lng: 103.3380 },
+                    'ท่าคันโท - หมู่ที่ 4': { lat: 16.4400, lng: 103.3450 },
+                    'นาตาล - หมู่ที่ 1': { lat: 16.4500, lng: 103.3300 },
+                    'นาตาล - หมู่ที่ 2': { lat: 16.4520, lng: 103.3280 },
+                    'นาตาล - หมู่ที่ 3': { lat: 16.4480, lng: 103.3320 }
+                };
+
+                // Create markers for each village
+                Object.entries(villageData).forEach(([key, data]) => {
+                    const coords = villageCoordinates[key] || { 
+                        lat: 16.4419 + (Math.random() - 0.5) * 0.01, 
+                        lng: 103.3419 + (Math.random() - 0.5) * 0.01 
+                    };
+                    
+                    // Determine marker color based on count
+                    let markerColor = 'green';
+                    if (data.count >= 15) markerColor = 'red';
+                    else if (data.count >= 8) markerColor = 'orange';
+                    else if (data.count >= 3) markerColor = 'yellow';
+
+                    const marker = new google.maps.Marker({
+                        position: coords,
+                        map: googleMap,
+                        title: `${data.tambon} - ${data.village}: ${data.count} คน`,
+                        icon: `http://maps.google.com/mapfiles/ms/icons/${markerColor}-dot.png`
+                    });
+
+                    // Create detailed info window for village
+                    const childrenList = data.children.slice(0, 5).map(child => 
+                        `<li style="margin: 2px 0; font-size: 12px;">
+                            ${child['ชื่อ-สกุลเด็กแรกเกิด'] || 'ไม่ระบุชื่อ'} 
+                            (${child['อายุเด็กแรกเกิด'] || 'ไม่ระบุอายุ'})
+                        </li>`
+                    ).join('');
+
+                    const moreChildren = data.count > 5 ? `<p style="font-size: 12px; color: #666; margin: 5px 0;">และอีก ${data.count - 5} คน</p>` : '';
+
+                    const infoWindow = new google.maps.InfoWindow({
+                        content: `
+                            <div style="padding: 12px; max-width: 300px;">
+                                <h3 style="margin: 0 0 8px 0; color: #2c3e50; font-size: 16px;">
+                                    🏘️ ${data.tambon} - ${data.village}
+                                </h3>
+                                <div style="border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px;">
+                                    <p style="margin: 3px 0; font-size: 14px;"><strong>📊 จำนวนเด็ก:</strong> ${data.count} คน</p>
+                                    <p style="margin: 3px 0; font-size: 14px;"><strong>📍 ตำบล:</strong> ${data.tambon}</p>
+                                    <p style="margin: 3px 0; font-size: 14px;"><strong>🏠 หมู่ที่:</strong> ${data.village}</p>
+                                    <p style="margin: 3px 0; font-size: 14px;"><strong>📈 สัดส่วน:</strong> ${((data.count / state.fullData.length) * 100).toFixed(1)}%</p>
+                                </div>
+                                ${data.count > 0 ? `
+                                    <div>
+                                        <p style="margin: 5px 0 3px 0; font-weight: bold; font-size: 13px;">👶 รายชื่อเด็ก:</p>
+                                        <ul style="margin: 0; padding-left: 15px;">
+                                            ${childrenList}
+                                        </ul>
+                                        ${moreChildren}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `
+                    });
+
+                    marker.addListener('click', () => {
+                        infoWindow.open(googleMap, marker);
+                    });
+                });
+
+                // Hide loading indicator
+                loadingMap.style.display = 'none';
+            };
+
+
+            window.initGoogleMap = function() {
+                const mapOptions = {
+                    center: { lat: 16.4419, lng: 103.3419 }, // ท่าคันโท coordinates
+                    zoom: 11,
+                    mapTypeId: 'roadmap'
+                };
+
+                const googleMap = new google.maps.Map(mapElement, mapOptions);
+
+                // Extract village data from the dataset
+                const villageData = state.fullData.reduce((acc, row) => {
+                    const tambon = row['ตำบล'];
+                    const village = row['หมู่ที่'] || row['หมู่บ้าน'] || row['หมู่'] || 'ไม่ระบุหมู่';
+                    
+                    if (tambon && village) {
+                        const key = `${tambon} - ${village}`;
+                        if (!acc[key]) {
+                            acc[key] = {
+                                tambon: tambon,
+                                village: village,
+                                count: 0,
+                                children: []
+                            };
+                        }
+                        acc[key].count++;
+                        acc[key].children.push(row);
+                    }
+                    return acc;
+                }, {});
+
+                // Sample coordinates for villages (you can replace with actual coordinates)
+                // Format: 'tambon - village': coordinates
+                const villageCoordinates = {
+                    'ท่าคันโท - หมู่ที่ 1': { lat: 16.4419, lng: 103.3419 },
+                    'ท่าคันโท - หมู่ที่ 2': { lat: 16.4450, lng: 103.3350 },
+                    'ท่าคันโท - หมู่ที่ 3': { lat: 16.4380, lng: 103.3380 },
+                    'ท่าคันโท - หมู่ที่ 4': { lat: 16.4400, lng: 103.3450 },
+                    'นาตาล - หมู่ที่ 1': { lat: 16.4500, lng: 103.3300 },
+                    'นาตาล - หมู่ที่ 2': { lat: 16.4520, lng: 103.3280 },
+                    'นาตาล - หมู่ที่ 3': { lat: 16.4480, lng: 103.3320 }
+                };
+
+                // Array to store all markers for clustering
+                const markers = [];
+
+                // Create markers for each village
+                Object.entries(villageData).forEach(([key, data]) => {
+                    const coords = villageCoordinates[key] || { 
+                        lat: 16.4419 + (Math.random() - 0.5) * 0.01, 
+                        lng: 103.3419 + (Math.random() - 0.5) * 0.01 
+                    };
+                    
+                    // Determine marker color based on count
+                    let markerColor = 'green';
+                    if (data.count >= 15) markerColor = 'red';
+                    else if (data.count >= 8) markerColor = 'orange';
+                    else if (data.count >= 3) markerColor = 'yellow';
+
+                    const marker = new google.maps.Marker({
+                        position: coords,
+                        title: `${data.tambon} - ${data.village}: ${data.count} คน`,
+                        icon: `http://maps.google.com/mapfiles/ms/icons/${markerColor}-dot.png`
+                    });
+
+                    // Create detailed info window for village
+                    const childrenList = data.children.slice(0, 5).map(child => 
+                        `<li style="margin: 2px 0; font-size: 12px;">
+                            ${child['ชื่อ-สกุลเด็กแรกเกิด'] || 'ไม่ระบุชื่อ'} 
+                            (${child['อายุเด็กแรกเกิด'] || 'ไม่ระบุอายุ'})
+                        </li>`
+                    ).join('');
+
+                    const moreChildren = data.count > 5 ? `<p style="font-size: 12px; color: #666; margin: 5px 0;">และอีก ${data.count - 5} คน</p>` : '';
+
+                    const infoWindow = new google.maps.InfoWindow({
+                        content: `
+                            <div style="padding: 12px; max-width: 300px;">
+                                <h3 style="margin: 0 0 8px 0; color: #2c3e50; font-size: 16px;">
+                                    🏘️ ${data.tambon} - ${data.village}
+                                </h3>
+                                <div style="border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px;">
+                                    <p style="margin: 3px 0; font-size: 14px;"><strong>📊 จำนวนเด็ก:</strong> ${data.count} คน</p>
+                                    <p style="margin: 3px 0; font-size: 14px;"><strong>📍 ตำบล:</strong> ${data.tambon}</p>
+                                    <p style="margin: 3px 0; font-size: 14px;"><strong>🏠 หมู่ที่:</strong> ${data.village}</p>
+                                    <p style="margin: 3px 0; font-size: 14px;"><strong>📈 สัดส่วน:</strong> ${((data.count / state.fullData.length) * 100).toFixed(1)}%</p>
+                                </div>
+                                ${data.count > 0 ? `
+                                    <div>
+                                        <p style="margin: 5px 0 3px 0; font-weight: bold; font-size: 13px;">👶 รายชื่อเด็ก:</p>
+                                        <ul style="margin: 0; padding-left: 15px;">
+                                            ${childrenList}
+                                        </ul>
+                                        ${moreChildren}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `
+                    });
+
+                    marker.addListener('click', () => {
+                        infoWindow.open(googleMap, marker);
+                    });
+
+                    // Add marker to array for clustering
+                    markers.push(marker);
+                });
+
+                // Initialize MarkerClusterer with custom styling
+                const markerCluster = new markerClusterer.MarkerClusterer({ 
+                    map: googleMap, 
+                    markers: markers,
+                    renderer: {
+                        render: ({ count, position }) => {
+                            // Custom cluster styling based on count
+                            let backgroundColor = '#4285f4';
+                            let textColor = 'white';
+                            let size = 40;
+                            
+                            if (count >= 50) {
+                                backgroundColor = '#ea4335';
+                                size = 60;
+                            } else if (count >= 20) {
+                                backgroundColor = '#ff9800';
+                                size = 50;
+                            } else if (count >= 10) {
+                                backgroundColor = '#fbbc04';
+                                textColor = 'black';
+                                size = 45;
+                            }
+
+                            return new google.maps.Marker({
+                                position,
+                                icon: {
+                                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+                                            <circle cx="${size/2}" cy="${size/2}" r="${size/2-2}" fill="${backgroundColor}" stroke="white" stroke-width="2"/>
+                                            <text x="${size/2}" y="${size/2}" text-anchor="middle" dominant-baseline="central" 
+                                                  fill="${textColor}" font-family="Arial, sans-serif" font-size="${size/3}" font-weight="bold">
+                                                ${count}
+                                            </text>
+                                        </svg>
+                                    `)}`,
+                                    scaledSize: new google.maps.Size(size, size),
+                                    anchor: new google.maps.Point(size/2, size/2)
+                                },
+                                title: `${count} หมู่บ้าน`
+                            });
+                        }
+                    },
+                    algorithm: new markerClusterer.SuperClusterAlgorithm({
+                        radius: 60,
+                        maxZoom: 15,
+                        minPoints: 2
+                    })
+                });
+
+                // Hide loading indicator
+                loadingMap.style.display = 'none';
+            };
+        }
+
+        // --- Table Functions ---
+        
+        function populateFilters() {
+            const yearFilter = document.getElementById('year-filter');
+            const provinceFilter = document.getElementById('province-filter');
+            const districtFilter = document.getElementById('district-filter');
+            const tambonFilter = document.getElementById('tambon-filter');
+
+            const years = [...new Set(state.fullData.map(row => parseDate(row['วัน/เดือน/ปีเกิดของเด็กแรกเกิด'])?.getFullYear()).filter(Boolean))].sort((a, b) => b - a);
+            const provinces = [...new Set(state.fullData.map(row => row['จังหวัด']).filter(Boolean))].sort();
+            const districts = [...new Set(state.fullData.map(row => row['อำเภอ']).filter(Boolean))].sort();
+            const tambons = [...new Set(state.fullData.map(row => row['ตำบล']).filter(Boolean))].sort();
+
+            yearFilter.innerHTML = '<option value="">-- เลือกปีเกิด --</option>';
+            years.forEach(year => yearFilter.innerHTML += `<option value="${year}">${year + 543}</option>`);
+
+            provinceFilter.innerHTML = '<option value="">-- เลือกจังหวัด --</option>';
+            provinces.forEach(p => provinceFilter.innerHTML += `<option value="${p}">${p}</option>`);
+
+            districtFilter.innerHTML = '<option value="">-- เลือกอำเภอ --</option>';
+            districts.forEach(d => districtFilter.innerHTML += `<option value="${d}">${d}</option>`);
+
+            tambonFilter.innerHTML = '<option value="">-- เลือกตำบล --</option>';
+            tambons.forEach(t => tambonFilter.innerHTML += `<option value="${t}">${t}</option>`);
+        }
+        
+        function applyFiltersAndRenderTable() {
+            const yearValue = document.getElementById('year-filter').value;
+            const provinceValue = document.getElementById('province-filter').value;
+            const districtValue = document.getElementById('district-filter').value;
+            const tambonValue = document.getElementById('tambon-filter').value;
+            const searchTerm = document.getElementById('table-search').value.toLowerCase();
+
+            let dataToFilter = [...state.fullData];
+
+            if (yearValue) {
+                dataToFilter = dataToFilter.filter(row => {
+                    const date = parseDate(row['วัน/เดือน/ปีเกิดของเด็กแรกเกิด']);
+                    return date && date.getFullYear().toString() === yearValue;
+                });
+            }
+            if (provinceValue) {
+                dataToFilter = dataToFilter.filter(row => row['จังหวัด'] === provinceValue);
+            }
+            if (districtValue) {
+                dataToFilter = dataToFilter.filter(row => row['อำเภอ'] === districtValue);
+            }
+            if (tambonValue) {
+                dataToFilter = dataToFilter.filter(row => row['ตำบล'] === tambonValue);
+            }
+            if (searchTerm) {
+                dataToFilter = dataToFilter.filter(row =>
+                    Object.values(row).some(value => String(value).toLowerCase().includes(searchTerm))
+                );
+            }
+
+            state.filteredData = dataToFilter;
+            state.currentPage = 1;
+            updateStats(state.filteredData);
+            renderTablePage();
+        }
+
+        function setupTable() {
+            populateFilters();
+
+            document.getElementById('year-filter').addEventListener('change', applyFiltersAndRenderTable);
+            document.getElementById('province-filter').addEventListener('change', applyFiltersAndRenderTable);
+            document.getElementById('district-filter').addEventListener('change', applyFiltersAndRenderTable);
+            document.getElementById('tambon-filter').addEventListener('change', applyFiltersAndRenderTable);
+            document.getElementById('table-search').addEventListener('input', applyFiltersAndRenderTable);
+            
+            document.getElementById('clear-filters-btn').addEventListener('click', () => {
+                document.getElementById('year-filter').value = '';
+                document.getElementById('province-filter').value = '';
+                document.getElementById('district-filter').value = '';
+                document.getElementById('tambon-filter').value = '';
+                document.getElementById('table-search').value = '';
+                applyFiltersAndRenderTable();
+            });
+
+            document.getElementById('prev-page').addEventListener('click', () => {
+                if (state.currentPage > 1) {
+                    state.currentPage--;
+                    renderTablePage();
+                }
+            });
+            document.getElementById('next-page').addEventListener('click', () => {
+                const maxPage = Math.ceil(state.filteredData.length / state.rowsPerPage);
+                if (state.currentPage < maxPage) {
+                    state.currentPage++;
+                    renderTablePage();
+                }
+            });
+            
+            applyFiltersAndRenderTable();
+        }
+        
+        function renderTablePage() {
+            const tableHead = document.getElementById('table-head');
+            const tableBody = document.getElementById('table-body');
+            const tableInfo = document.getElementById('table-info');
+
+            tableHead.innerHTML = '';
+            tableBody.innerHTML = '';
+
+            if (state.filteredData.length === 0) {
+                 tableInfo.textContent = 'ไม่พบข้อมูล';
+                 tableBody.innerHTML = `<tr><td colspan="15" class="text-center p-8 text-slate-500">ไม่พบข้อมูลที่ตรงกับตัวกรอง</td></tr>`;
+                 document.getElementById('prev-page').disabled = true;
+                 document.getElementById('next-page').disabled = true;
+                 return;
+            }
+
+            const headers = Object.keys(state.filteredData[0]);
+            const headerRow = document.createElement('tr');
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.scope = 'col';
+                th.className = 'px-6 py-3';
+                th.textContent = header;
+                headerRow.appendChild(th);
+            });
+            tableHead.appendChild(headerRow);
+            
+            const startIndex = (state.currentPage - 1) * state.rowsPerPage;
+            const endIndex = startIndex + state.rowsPerPage;
+            const pageData = state.filteredData.slice(startIndex, endIndex);
+
+            pageData.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = 'bg-white border-b hover:bg-slate-50';
+                headers.forEach(header => {
+                    const td = document.createElement('td');
+                    td.className = 'px-6 py-4 whitespace-nowrap';
+                    td.textContent = row[header] || '-';
+                    tr.appendChild(td);
+                });
+                tableBody.appendChild(tr);
+            });
+            
+            const endItem = Math.min(endIndex, state.filteredData.length);
+            tableInfo.textContent = `แสดง ${startIndex + 1} ถึง ${endItem} จากทั้งหมด ${state.filteredData.length} รายการ`;
+
+            document.getElementById('prev-page').disabled = state.currentPage === 1;
+            document.getElementById('next-page').disabled = endIndex >= state.filteredData.length;
+        }
+    </script>
+</body>
+</html>
